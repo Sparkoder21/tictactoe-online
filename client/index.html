@@ -1,0 +1,1086 @@
+<!DOCTYPE html>
+<html>
+<head>
+	<meta charset="utf-8"/>
+	<meta name="viewport" content="width=device-width, initial-scale=1, minimum-scale=1, user-scalable=no"/>
+	<script src="libraries/socket.io.min.js"></script>
+	<script src="libraries/popify.min.js"></script>
+	<title> Tic Tac Toe </title>
+<style>
+
+html{
+	-webkit-user-select: none;
+	-moz-user-select: none;
+	-ms-user-select: none;
+	-o-user-select: none;
+	user-select: none;
+	overflow: hidden;
+	font-family: monospace;
+}
+body{
+	margin: 0;
+	padding: 0;
+}
+#box{
+	position: absolute;
+	left: 50%;
+	top: 50%;
+	transform: translate(-50%, -50%);
+}
+#base{
+	position: absolute;
+	left: 0;
+	top: 0;
+	width: 100%;
+	height: 100%;
+}
+#ui{
+	position: absolute;
+	left: 0;
+	top: 0;
+	width: 100%;
+	height: 100%;
+}
+#button{
+	position: absolute;
+	left: 50%;
+	bottom: 1%;
+	width: 40%;
+	height: 5%;
+	display: flex;
+	align-items: center;
+	justify-content: center;
+	font-size: 5px;
+	color: #ffffff;
+	background: #000000;
+	border-radius: 20px;
+	transform: translate(-50%, 0);
+}
+
+</style>
+</head>
+<body>
+<div id="box">
+	<canvas id="base"></canvas>
+	<div id="ui">
+		<span id="button"><h1> Switch Mode </h1></span>
+	</div>
+</div>
+<script>
+
+function Game(){
+	const game = {};
+
+	function main(){
+		game.box = document.querySelector("#box");
+		game.base = document.querySelector("#base");
+		game.button = document.querySelector("#button");
+		game.context = game.base.getContext("2d");
+
+		game.ratio = 2/3;
+
+		game.width = 400;
+		game.height = 600;
+
+		game.base.width = game.width;
+		game.base.height = game.height;
+
+		setup();
+		load();
+	}
+	function load(){
+		game.baseurl = "assets/";
+
+		game.asseturls = [["header", "header.png"], ["board", "board.png"], ["x", "x.png"], ["o", "o.png"]];
+
+		game.assets = [];
+		game.assetCounter = 0;
+
+		game.asseturls.forEach((url) => {
+			const asseturl = `${game.baseurl}${url[1]}`;
+
+			fetch(asseturl).then((response) => {
+				return response.blob();
+			}).then((blob) => {
+				const asseturl = URL.createObjectURL(blob);
+
+				const image = new Image();
+
+				image.src = asseturl;
+
+				game.assets[url[0]] = image;
+
+				++game.assetCounter;
+
+				if (game.assetCounter === game.asseturls.length){
+					loaded();
+
+					start();
+				}
+			});
+		});
+		loadify({
+			darkMode: false
+		});
+	}
+	function loaded(){
+		loadified();
+	}
+	function setup(){
+		addLogic();
+		addEventListeners();
+	}
+	function start(){
+		addBackground();
+		addHeader();
+		addBoard();
+		addSymbols();
+		addTurn();
+		addOptions();
+		loop();
+	}
+	function addBackground(){
+		game.background = {
+			color: "#ffffff",
+			x: 0,
+			y: 0,
+			width: game.width,
+			height: game.height,
+
+			render(){
+				game.context.fillStyle = game.background.color;
+
+				game.context.fillRect(0, 0, game.width, game.height);
+			}
+		};
+	}
+	function addHeader(){
+		game.header = {
+			image: game.assets.header,
+			x: -5,
+			y: -10,
+			width: game.width + 15,
+			height: game.height/7,
+
+			render(){
+				game.context.drawImage(game.header.image, game.header.x, game.header.y, game.header.width, game.header.height);
+			}
+		};
+	}
+	function addBoard(){
+		game.board = {
+			image: game.assets.board,
+			x: 0,
+			y: 90,
+			width: 400,
+			height: 400,
+
+			render(){
+				game.context.drawImage(game.board.image, game.board.x, game.board.y, game.board.width, game.board.height);
+			}
+		};		
+	}
+	function addTurn(){
+		game.turn = {
+			color: "#000000",
+			style: "Bold 18px Monospace",
+			align: "center",
+			text: `Player ${game.logic.turn + 1}'s turn`,
+			sign: "Player 1 is O   Player 2 is X",
+			x: 200,
+			y: 510,
+
+			render(){
+				game.context.fillStyle = game.turn.color;
+				game.context.font = game.turn.style;
+				game.context.textAlign = game.turn.align;
+
+				game.context.fillText(game.turn.text, game.turn.x, game.turn.y);
+				game.context.fillText(game.turn.sign, game.turn.x, game.turn.y + 40);
+			}
+		};
+	}
+	function addLogic(){
+		game.mode = 0;
+
+		game.logic = {
+			board: [
+				[0, 0, 0], 
+				[0, 0, 0], 
+				[0, 0, 0]
+			],
+			length: 9,
+			symbols: 0,
+			turn: 0,
+
+			update(){
+				if (game.mode === 1 || game.mode === 2){
+					game.logic.checkLogic();
+				}
+			},
+			updateTurn(){
+				game.turn.text = `Player ${game.logic.turn + 1}'s turn`;
+
+				++game.logic.symbols;
+			},
+			checkLogic(){
+				if (
+					((game.logic.board[0][0] !== 0) && (game.logic.board[0][0] === game.logic.board[0][1]) && (game.logic.board[0][0] === game.logic.board[0][2])) ||
+					((game.logic.board[1][0] !== 0) && (game.logic.board[1][0] === game.logic.board[1][1]) && (game.logic.board[1][0] === game.logic.board[1][2])) ||
+					((game.logic.board[2][0] !== 0) && (game.logic.board[2][0] === game.logic.board[2][1]) && (game.logic.board[2][0] === game.logic.board[2][2])) ||
+					((game.logic.board[0][0] !== 0) && (game.logic.board[0][0] === game.logic.board[1][0]) && (game.logic.board[0][0] === game.logic.board[2][0])) ||
+					((game.logic.board[0][1] !== 0) && (game.logic.board[0][1] === game.logic.board[1][1]) && (game.logic.board[0][1] === game.logic.board[2][1])) ||
+					((game.logic.board[0][2] !== 0) && (game.logic.board[0][2] === game.logic.board[1][2]) && (game.logic.board[0][2] === game.logic.board[2][2])) ||
+					((game.logic.board[0][0] !== 0) && (game.logic.board[0][0] === game.logic.board[1][1]) && (game.logic.board[0][0] === game.logic.board[2][2])) ||
+					((game.logic.board[0][2] !== 0) && (game.logic.board[0][2] === game.logic.board[1][1]) && (game.logic.board[0][2] === game.logic.board[2][0]))
+				){
+					const symbols = {
+						x: 0,
+						o: 0
+					};
+
+					game.logic.board.forEach((row) => {
+						row.forEach((value) => {
+							if (value === 1){
+								++symbols.x;
+							}
+							else if (value === 2){
+								++symbols.o;
+							}
+						});
+					});
+
+					const mode = game.mode;
+
+					if (symbols.o > symbols.x){
+						game.mode = 0;
+
+						game.logic.gameOver("Player 1", mode);
+					}
+					else{
+						game.mode = 0;
+
+						game.logic.gameOver("Player 2", mode);						
+					}
+				}
+				if (game.mode && (game.logic.symbols === game.logic.length)){
+					const mode = game.mode;
+
+					game.mode = 0;
+
+					game.logic.gameDrawn(mode);
+				}
+				if (game.mode === 1 && game.logic.turn){
+					if (game.logic.symbols < 9){
+						game.logic.makeMove();
+
+						game.logic.turn = 0;
+
+						game.logic.updateTurn();
+					}
+				}
+			},
+			random(min, max){
+				return (Math.floor(Math.random()*(max - min)) + min);
+			},
+			randomMove(){
+				return (game.logic.random(0, 3));
+			},
+			makeMove(){
+				const row = game.logic.randomMove();
+				const column = game.logic.randomMove();
+
+				if (game.logic.board[row][column] === 0){
+					game.logic.board[row][column] = 1;
+				}
+				else{
+					game.logic.makeMove();
+				}
+			},
+			gameOver(winner, mode){
+				toastify({
+					text: (mode === 1 ? (winner === "Player 1" ? "You Won" : "Bot Won") : `${winner} Won`),
+					toastBoxColor: "#000000",
+					toastBoxTextColor: "#ffffff",
+					toastBoxShadow: "none",
+					toastBoxTextAlign: "center",
+					toastWidth: "90vw",
+					animationIn: "fade-down",
+					animationOut: "fade-up",
+					position: "top left",
+					toastCloseTimer: "3000"
+				});
+				setTimeout(() => {
+					game.logic.reset();
+
+					if (mode === 1){
+						game.mode = 1;
+					}
+					else{
+						game.mode = 2;
+					}
+					window.addEventListener("pointerdown", handleClick);
+				}, 1500);
+				window.removeEventListener("pointerdown", handleClick);
+			},
+			gameDrawn(mode){
+				toastify({
+					text: "Game Drawn",
+					toastBoxColor: "#000000",
+					toastBoxTextColor: "#ffffff",
+					toastBoxShadow: "none",
+					toastBoxTextAlign: "center",
+					toastWidth: "90vw",
+					animationIn: "fade-down",
+					animationOut: "fade-up",
+					position: "top left",
+					toastCloseTimer: "3000"
+				});
+				setTimeout(() => {
+					game.logic.reset();
+
+					if (mode === 1){
+						game.mode = 1;
+					}
+					else{
+						game.mode = 2;
+					}
+					window.addEventListener("pointerdown", handleClick);
+				}, 1500);
+				window.removeEventListener("pointerdown", handleClick);
+			},
+			click(event){
+				const bounds = game.base.getBoundingClientRect();
+
+				const x = (event.clientX - bounds.left)*(game.base.width/game.base.clientWidth);
+				const y = (event.clientY - bounds.top)*(game.base.height/game.base.clientHeight);
+
+				if (game.mode === 1){
+					if (!game.logic.turn){
+						if (x > 30 && y > 130 && x < 110 && y < 210 && game.logic.board[0][0] === 0){
+							game.logic.board[0][0] = 2;
+
+							game.logic.turn = 1;
+
+							game.logic.updateTurn();
+						}
+						else if (x > 153 && y > 130 && x < 243 && y < 210 && game.logic.board[0][1] === 0){
+							game.logic.board[0][1] = 2;
+
+							game.logic.turn = 1;
+
+							game.logic.updateTurn();
+						}
+						else if (x > 275 && y > 130 && x < 365 && y < 210 && game.logic.board[0][2] === 0){
+							game.logic.board[0][2] = 2;
+
+							game.logic.turn = 1;
+
+							game.logic.updateTurn();
+						}
+						else if (x > 30 && y > 250 && x < 110 && y < 330 && game.logic.board[1][0] === 0){
+							game.logic.board[1][0] = 2;
+
+							game.logic.turn = 1;
+
+							game.logic.updateTurn();
+						}
+						else if (x > 153 && y > 250 && x < 243 && y < 330 && game.logic.board[1][1] === 0){
+							game.logic.board[1][1] = 2;
+
+							game.logic.turn = 1;
+
+							game.logic.updateTurn();
+						}
+						else if (x > 275 && y > 250 && x < 365 && y < 330 && game.logic.board[1][2] === 0){
+							game.logic.board[1][2] = 2;
+
+							game.logic.turn = 1;
+
+							game.logic.updateTurn();
+						}
+						else if (x > 30 && y > 370 && x < 110 && y < 450 && game.logic.board[2][0] === 0){
+							game.logic.board[2][0] = 2;
+
+							game.logic.turn = 1;
+
+							game.logic.updateTurn();
+						}
+						else if (x > 153 && y > 370 && x < 243 && y < 450 && game.logic.board[2][1] === 0){
+							game.logic.board[2][1] = 2;
+
+							game.logic.turn = 1;
+
+							game.logic.updateTurn();
+						}
+						else if (x > 275 && y > 370 && x < 365 && y < 450 && game.logic.board[2][2] === 0){
+							game.logic.board[2][2] = 2;
+						
+							game.logic.turn = 1;
+
+							game.logic.updateTurn();
+						}
+					}
+				}
+				else{
+					if (game.logic.turn){
+						if (x > 30 && y > 130 && x < 110 && y < 210 && game.logic.board[0][0] === 0){
+							game.logic.board[0][0] = 1;
+
+							game.logic.turn = 0;
+
+							game.logic.updateTurn();
+						}
+						else if (x > 153 && y > 130 && x < 243 && y < 210 && game.logic.board[0][1] === 0){
+							game.logic.board[0][1] = 1;
+
+							game.logic.turn = 0;
+
+							game.logic.updateTurn();
+						}
+						else if (x > 275 && y > 130 && x < 365 && y < 210 && game.logic.board[0][2] === 0){
+							game.logic.board[0][2] = 1;
+
+							game.logic.turn = 0;
+
+							game.logic.updateTurn();
+						}
+						else if (x > 30 && y > 250 && x < 110 && y < 330 && game.logic.board[1][0] === 0){
+							game.logic.board[1][0] = 1;
+
+							game.logic.turn = 0;
+
+							game.logic.updateTurn();
+						}
+						else if (x > 153 && y > 250 && x < 243 && y < 330 && game.logic.board[1][1] === 0){
+							game.logic.board[1][1] = 1;
+
+							game.logic.turn = 0;
+
+							game.logic.updateTurn();
+						}
+						else if (x > 275 && y > 250 && x < 365 && y < 330 && game.logic.board[1][2] === 0){
+							game.logic.board[1][2] = 1;
+
+							game.logic.turn = 0;
+
+							game.logic.updateTurn();
+						}
+						else if (x > 30 && y > 370 && x < 110 && y < 450 && game.logic.board[2][0] === 0){
+							game.logic.board[2][0] = 1;
+
+							game.logic.turn = 0;
+
+							game.logic.updateTurn();
+						}
+						else if (x > 153 && y > 370 && x < 243 && y < 450 && game.logic.board[2][1] === 0){
+							game.logic.board[2][1] = 1;
+
+							game.logic.turn = 0;
+
+							game.logic.updateTurn();
+						}
+						else if (x > 275 && y > 370 && x < 365 && y < 450 && game.logic.board[2][2] === 0){
+							game.logic.board[2][2] = 1;
+						
+							game.logic.turn = 0;
+
+							game.logic.updateTurn();
+						}
+					}
+					else{
+						if (x > 30 && y > 130 && x < 110 && y < 210 && game.logic.board[0][0] === 0){
+							game.logic.board[0][0] = 2;
+
+							game.logic.turn = 1;
+
+							game.logic.updateTurn();
+						}
+						else if (x > 153 && y > 130 && x < 243 && y < 210 && game.logic.board[0][1] === 0){
+							game.logic.board[0][1] = 2;
+
+							game.logic.turn = 1;
+
+							game.logic.updateTurn();
+						}
+						else if (x > 275 && y > 130 && x < 365 && y < 210 && game.logic.board[0][2] === 0){
+							game.logic.board[0][2] = 2;
+
+							game.logic.turn = 1;
+
+							game.logic.updateTurn();
+						}
+						else if (x > 30 && y > 250 && x < 110 && y < 330 && game.logic.board[1][0] === 0){
+							game.logic.board[1][0] = 2;
+
+							game.logic.turn = 1;
+
+							game.logic.updateTurn();
+						}
+						else if (x > 153 && y > 250 && x < 243 && y < 330 && game.logic.board[1][1] === 0){
+							game.logic.board[1][1] = 2;
+
+							game.logic.turn = 1;
+
+							game.logic.updateTurn();
+						}
+						else if (x > 275 && y > 250 && x < 365 && y < 330 && game.logic.board[1][2] === 0){
+							game.logic.board[1][2] = 2;
+
+							game.logic.turn = 1;
+
+							game.logic.updateTurn();
+						}
+						else if (x > 30 && y > 370 && x < 110 && y < 450 && game.logic.board[2][0] === 0){
+							game.logic.board[2][0] = 2;
+
+							game.logic.turn = 1;
+
+							game.logic.updateTurn();
+						}
+						else if (x > 153 && y > 370 && x < 243 && y < 450 && game.logic.board[2][1] === 0){
+							game.logic.board[2][1] = 2;
+
+							game.logic.turn = 1;
+
+							game.logic.updateTurn();
+						}
+						else if (x > 275 && y > 370 && x < 365 && y < 450 && game.logic.board[2][2] === 0){
+							game.logic.board[2][2] = 2;
+
+							game.logic.turn = 1;
+
+							game.logic.updateTurn();
+						}
+					}
+				}
+			},
+			softReset(){
+				game.logic.board = [[0, 0, 0], [0, 0, 0], [0, 0, 0]];
+				game.logic.turn = 0;
+
+				if (game.socket.player === 1){
+					if (game.logic.turn){
+						game.socket.turn = true;
+					}
+					else{
+						game.socket.turn = false;
+					}
+				}
+				else if (game.socket.player === 2){
+					if (game.logic.turn){
+						game.socket.turn = false;
+					}
+					else{
+						game.socket.turn = true;
+					}
+				}
+				game.turn.text = `Player ${game.logic.turn + 1}'s turn`;
+			},
+			reset(){
+				game.mode = 0;
+
+				game.logic.board = [[0, 0, 0], [0, 0, 0], [0, 0, 0]];
+				game.logic.symbols = 0;
+				game.logic.turn = 0;
+
+				game.turn.text = `Player ${game.logic.turn + 1}'s turn`;
+			}
+		};
+		game.logic.update();
+	}
+	function addSymbols(){
+		game.symbolPosition = [
+			[{x: 30, y: 130}, {x: 153, y: 130}, {x: 275, y: 130}],
+			[{x: 30, y: 250}, {x: 153, y: 250}, {x: 275, y: 250}],
+			[{x: 30, y: 370}, {x: 153, y: 370}, {x: 275, y: 370}]
+		];
+		game.symbols = {
+			images: [game.assets.x, game.assets.o],
+			width: 90,
+			height: 80,
+
+			render(){
+				game.logic.board.forEach((row, rowIndex) => {
+					row.forEach((value, index) => {
+						if (value){
+							game.context.drawImage(game.symbols.images[value - 1], game.symbolPosition[rowIndex][index].x, game.symbolPosition[rowIndex][index].y, game.symbols.width, game.symbols.height);
+						}
+					});
+				});
+			}
+		}
+	}
+	function addOptions(){
+		game.mode = 0;
+
+		game.logic.reset();
+
+		alertify({
+			title: "Choose Game Mode",
+			denyButton: true,
+			cancelButton: true,
+			confirmButtonColor: "#000000",
+			denyButtonColor: "#000000",
+			cancelButtonColor: "#000000",
+			confirmButtonText: "Single Player",
+			denyButtonText: "Offline Two Player",
+			cancelButtonText: "Online Two Player",
+
+			onConfirmed(){
+				game.mode = 1;
+			},
+			onDenied(){
+				game.mode = 2;
+			},
+			onCanceled(){
+				addOnlineOptions();
+			}
+		});
+	}
+	function addOnlineOptions(){
+		alertify({
+			title: "Host or Join",
+			denyButton: true,
+			cancelButton: true,
+			confirmButtonColor: "#000000",
+			denyButtonColor: "#000000",
+			cancelButtonColor: "#000000",
+			confirmButtonText: "Host",
+			denyButtonText: "Back",
+			cancelButtonText: "Join",
+
+			onConfirmed(){
+				loadify({
+					darkMode: false
+				});
+				addSocket(true, null);
+			},
+			onDenied(){
+				addOptions();
+			},
+			onCanceled(){
+				alertify({
+					title: "Enter Code",
+					input: true,
+					cancelButton: true,
+					confirmButtonColor: "#000000",
+					cancelButtonColor: "#000000",
+					confirmButtonText: "Join",
+					cancelButtonText: "Back",
+
+					onConfirmed(id){
+						loadify({
+							darkMode: false
+						});
+						addSocket(false, id);
+					},
+					onCanceled(){
+						addOptions();
+					}
+				});
+			}
+		});
+	}
+	function addSocket(host, gameID){
+		game.socket = io("localhost:3000");
+
+		game.socket.on("connected", (id) => {
+			if (host){
+				game.socket.gameID = id;
+				game.socket.player = 2;
+				game.socket.playing = false;
+				game.socket.turn = true;
+
+				alertify({
+					title: "Share this ID to Join",
+					text: id,
+					confirmButtonColor: "#000000",
+					confirmButtonText: "OK",
+
+					onConfirmed(){
+						game.mode = 3;
+					}
+				});
+				loadified();
+			}
+			else{
+				game.socket.player = 1;
+				game.socket.playing = false;
+				game.socket.turn = false;
+
+				game.socket.emit("joinGame", gameID);
+			}
+		});
+
+		game.socket.on("toStart", () => {
+			toastify({
+				text: "No one has joined yet",
+				toastBoxColor: "#000000",
+				toastBoxTextColor: "#ffffff",
+				toastBoxShadow: "none",
+				toastBoxTextAlign: "center",
+				toastWidth: "90vw",
+				animationIn: "fade-down",
+				animationOut: "fade-up",
+				position: "top left",
+				toastCloseTimer: "3000"
+			});
+		});
+
+		game.socket.on("gameJoined", (id) => {
+			toastify({
+				text: "You've joined the Game | Player 1's turn",
+				toastBoxColor: "#000000",
+				toastBoxTextColor: "#ffffff",
+				toastBoxShadow: "none",
+				toastBoxTextAlign: "center",
+				toastWidth: "90vw",
+				animationIn: "fade-down",
+				animationOut: "fade-up",
+				position: "top left",
+				toastCloseTimer: "3000"
+			});
+			game.socket.gameID = id;
+			game.socket.playing = true;
+			game.mode = 3;
+
+			loadified();
+		});
+
+		game.socket.on("newJoined", () => {
+			toastify({
+				text: "Player 2 joined | It's your turn",
+				toastBoxColor: "#000000",
+				toastBoxTextColor: "#ffffff",
+				toastBoxShadow: "none",
+				toastBoxTextAlign: "center",
+				toastWidth: "90vw",
+				animationIn: "fade-down",
+				animationOut: "fade-up",
+				position: "top left",
+				toastCloseTimer: "3000"
+			});
+			game.socket.playing = true;
+		});
+
+		game.socket.on("playerTurn", () => {
+			toastify({
+				text: "Other player's turn",
+				toastBoxColor: "#000000",
+				toastBoxTextColor: "#ffffff",
+				toastBoxShadow: "none",
+				toastBoxTextAlign: "center",
+				toastWidth: "90vw",
+				animationIn: "fade-down",
+				animationOut: "fade-up",
+				position: "top left",
+				toastCloseTimer: "3000"
+			});
+		});
+
+		game.socket.on("gameUpdate", (data) => {
+			game.logic.board = data.board;
+			game.logic.turn = data.turn;
+
+			if (game.socket.player === 1){
+				if (game.logic.turn){
+					game.socket.turn = true;
+				}
+				else{
+					game.socket.turn = false;
+				}
+			}
+			else if (game.socket.player === 2){
+				if (game.logic.turn){
+					game.socket.turn = false;
+				}
+				else{
+					game.socket.turn = true;
+				}
+			}
+			game.turn.text = `Player ${game.logic.turn + 1}'s turn`;
+		});
+
+		game.socket.on("gameOver", (player) => {
+			if (player === "draw"){
+				toastify({
+					text: "Game Drawn",
+					toastBoxColor: "#000000",
+					toastBoxTextColor: "#ffffff",
+					toastBoxShadow: "none",
+					toastBoxTextAlign: "center",
+					toastWidth: "90vw",
+					animationIn: "fade-down",
+					animationOut: "fade-up",
+					position: "top left",
+					toastCloseTimer: "3000"
+				});
+			}
+			else{
+				toastify({
+					text: `${player} Won`,
+					toastBoxColor: "#000000",
+					toastBoxTextColor: "#ffffff",
+					toastBoxShadow: "none",
+					toastBoxTextAlign: "center",
+					toastWidth: "90vw",
+					animationIn: "fade-down",
+					animationOut: "fade-up",
+					position: "top left",
+					toastCloseTimer: "3000"
+				});
+			}
+			setTimeout(() => {
+				game.logic.softReset();
+			}, 1500);
+			window.removeEventListener("pointerdown", handleClick);
+		});
+
+		game.socket.on("gameResume", () => {
+			window.addEventListener("pointerdown", handleClick);
+		});
+
+		game.socket.on("noGame", () => {
+			toastify({
+				text: "Game ID does not exist",
+				toastBoxColor: "#000000",
+				toastBoxTextColor: "#ffffff",
+				toastBoxShadow: "none",
+				toastBoxTextAlign: "center",
+				toastWidth: "90vw",
+				animationIn: "fade-down",
+				animationOut: "fade-up",
+				position: "top left",
+				toastCloseTimer: "3000"
+			});
+			addOptions();
+			loadified();
+		});
+
+		game.socket.on("playerDisconnected", () => {
+			toastify({
+				text: "Other player disconnected | Please restart",
+				toastBoxColor: "#000000",
+				toastBoxTextColor: "#ffffff",
+				toastBoxShadow: "none",
+				toastBoxTextAlign: "center",
+				toastWidth: "90vw",
+				animationIn: "fade-down",
+				animationOut: "fade-up",
+				position: "top left",
+				toastCloseTimer: "3000"
+			});
+			addOptions();
+		});
+
+		game.online = {
+			click(){
+				const bounds = game.base.getBoundingClientRect();
+
+				const x = (event.clientX - bounds.left)*(game.base.width/game.base.clientWidth);
+				const y = (event.clientY - bounds.top)*(game.base.height/game.base.clientHeight);
+
+				game.socket.emit("sendClick", {
+					id: game.socket.gameID,
+					pointerX: x,
+					pointerY: y
+				});
+
+				if (game.socket.turn && game.socket.playing){
+					if (x > 30 && y > 130 && x < 110 && y < 210 && game.logic.board[0][0] === 0){
+						game.socket.turn = false;
+
+						if (game.logic.turn){
+							game.logic.turn = 0;
+						}
+						else{
+							game.logic.turn = 1;
+						}
+						game.turn.text = `Player ${game.logic.turn + 1}'s turn`;
+
+						game.logic.board[0][0] = game.socket.player;
+					}
+					else if (x > 153 && y > 130 && x < 243 && y < 210 && game.logic.board[0][1] === 0){
+						game.socket.turn = false;
+
+						if (game.logic.turn){
+							game.logic.turn = 0;
+						}
+						else{
+							game.logic.turn = 1;
+						}
+						game.turn.text = `Player ${game.logic.turn + 1}'s turn`;
+
+						game.logic.board[0][1] = game.socket.player;
+					}
+					else if (x > 275 && y > 130 && x < 365 && y < 210 && game.logic.board[0][2] === 0){
+						game.socket.turn = false;
+
+						if (game.logic.turn){
+							game.logic.turn = 0;
+						}
+						else{
+							game.logic.turn = 1;
+						}
+						game.turn.text = `Player ${game.logic.turn + 1}'s turn`;
+
+						game.logic.board[0][2] = game.socket.player;
+					}
+					else if (x > 30 && y > 250 && x < 110 && y < 330 && game.logic.board[1][0] === 0){
+						game.socket.turn = false;
+
+						if (game.logic.turn){
+							game.logic.turn = 0;
+						}
+						else{
+							game.logic.turn = 1;
+						}
+						game.turn.text = `Player ${game.logic.turn + 1}'s turn`;
+
+						game.logic.board[1][0] = game.socket.player;
+					}
+					else if (x > 153 && y > 250 && x < 243 && y < 330 && game.logic.board[1][1] === 0){
+						game.socket.turn = false;
+
+						if (game.logic.turn){
+							game.logic.turn = 0;
+						}
+						else{
+							game.logic.turn = 1;
+						}
+						game.turn.text = `Player ${game.logic.turn + 1}'s turn`;
+
+						game.logic.board[1][1] = game.socket.player;
+					}
+					else if (x > 275 && y > 250 && x < 365 && y < 330 && game.logic.board[1][2] === 0){
+						game.socket.turn = false;
+
+						if (game.logic.turn){
+							game.logic.turn = 0;
+						}
+						else{
+							game.logic.turn = 1;
+						}
+						game.turn.text = `Player ${game.logic.turn + 1}'s turn`;
+
+						game.logic.board[1][2] = game.socket.player;
+					}
+					else if (x > 30 && y > 370 && x < 110 && y < 450 && game.logic.board[2][0] === 0){
+						game.socket.turn = false;
+
+						if (game.logic.turn){
+							game.logic.turn = 0;
+						}
+						else{
+							game.logic.turn = 1;
+						}
+						game.turn.text = `Player ${game.logic.turn + 1}'s turn`;
+
+						game.logic.board[2][0] = game.socket.player;
+					}
+					else if (x > 153 && y > 370 && x < 243 && y < 450 && game.logic.board[2][1] === 0){
+						game.socket.turn = false;
+
+						if (game.logic.turn){
+							game.logic.turn = 0;
+						}
+						else{
+							game.logic.turn = 1;
+						}
+						game.turn.text = `Player ${game.logic.turn + 1}'s turn`;
+
+						game.logic.board[2][1] = game.socket.player;
+					}
+					else if (x > 275 && y > 370 && x < 365 && y < 450 && game.logic.board[2][2] === 0){
+						game.socket.turn = false;
+
+						if (game.logic.turn){
+							game.logic.turn = 0;
+						}
+						else{
+							game.logic.turn = 1;
+						}
+						game.turn.text = `Player ${game.logic.turn + 1}'s turn`;
+
+						game.logic.board[2][2] = game.socket.player;
+					}
+				}
+			}
+		};
+	}
+	function removeSocket(){
+		if (game.socket){
+			game.socket.emit("cutConnection", game.socket.gameID);
+			game.socket = null;
+		}
+	}
+	function addEventListeners(){
+		button.addEventListener("pointerdown", handleButton);
+		window.addEventListener("pointerdown", handleClick);
+		window.addEventListener("beforeunload", removeSocket);
+	}
+	function handleButton(){
+		if (game.socket){
+			game.socket.emit("cutConnection", game.socket.gameID);
+			game.socket = null;
+
+			addOptions();
+		}
+		else{
+			addOptions();
+		}
+		
+	}
+	function handleClick(event){
+		if (game.mode){
+			if (game.mode === 1 || game.mode === 2){
+				game.logic.click(event);
+			}
+			else if (game.mode === 3){
+				game.online.click(event);
+			}
+		}
+	}
+	function update(){
+		game.logic.update();
+	}
+	function render(){
+		game.background.render();
+		game.header.render();
+		game.board.render();
+		game.symbols.render();
+		game.turn.render();
+	}
+	function loop(){
+		render();
+		update();
+
+		window.requestAnimationFrame(loop);
+	}
+	function resize(){
+		if (window.innerWidth/window.innerHeight < game.ratio){
+			game.box.style.width = `${window.innerWidth}px`;
+			game.box.style.height = `${window.innerWidth/game.ratio}px`;
+		}
+		else{
+			game.box.style.width = `${window.innerHeight*game.ratio}px`;
+			game.box.style.height = `${window.innerHeight}px`;
+		}
+	}
+	function initalize(){
+		main();
+		resize();
+
+		window.addEventListener("contextmenu", (event) => {
+			event.preventDefault();
+		});
+		window.addEventListener("resize", resize);
+	}
+	initalize()
+}
+window.addEventListener("load", Game);
+
+</script>
+</body>
+</html>
