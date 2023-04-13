@@ -1,0 +1,14 @@
+{
+  "name": "tictactoeserver",
+  "version": "1.0.0",
+  "description": "",
+  "main": "server.js",
+  "scripts": {
+    "test": "nodemon start"
+  },
+  "author": "Sparkoder",
+  "license": "ISC",
+  "dependencies": {
+    "socket.io": "^4.6.1"
+  }
+}
