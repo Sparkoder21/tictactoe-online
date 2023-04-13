@@ -1,2 +1,2 @@
 # tictactoe-online
-## https://taconline.pages.dev/
+## https://tictaconline.pages.dev/
